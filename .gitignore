@@ -7,3 +7,4 @@ notes-private/
 *.pem
 credentials.json
 secrets.yml
+windows-endpoint-lab.code-workspace
