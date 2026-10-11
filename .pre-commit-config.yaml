@@ -1,0 +1,36 @@
+# Pre-commit checks for this repo. Install once per clone:
+#   pip install pre-commit
+#   pre-commit install
+# These patterns are deliberately generic, so this file does not itself reveal anything private.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+  - repo: local
+    hooks:
+      - id: no-tenant-domain
+        name: Block a real Microsoft tenant domain
+        language: pygrep
+        entry: '[A-Za-z0-9-]+\.onmicrosoft\.com'
+        types: [text]
+      - id: no-recovery-key
+        name: Block a BitLocker recovery password
+        language: pygrep
+        entry: '\b\d{6}(-\d{6}){7}\b'
+        types: [text]
+      - id: no-mac-address
+        name: Block MAC addresses
+        language: pygrep
+        entry: '\b([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b'
+        types: [text]
+      - id: no-guid
+        name: Block GUIDs (tenant, device, object and policy IDs)
+        language: pygrep
+        entry: '\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b'
+        types: [text]
+      - id: no-global-ipv6
+        name: Block public IPv6 addresses
+        language: pygrep
+        entry: '\b[23][0-9a-fA-F]{3}:[0-9a-fA-F]{1,4}:[0-9a-fA-F:]{2,}'
+        types: [text]

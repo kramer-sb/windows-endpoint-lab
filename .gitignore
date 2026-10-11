@@ -1,0 +1,9 @@
+# Keep raw, unredacted screenshots and notes out of the repo
+screenshots/raw/
+*.raw.png
+notes-private/
+.env
+*.key
+*.pem
+credentials.json
+secrets.yml
