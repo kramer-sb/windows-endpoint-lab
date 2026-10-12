@@ -35,6 +35,18 @@ I took a snapshot before each risky change, so every part of the lab had a rollb
 
 Result: all eight compliance settings report compliant, `manage-bde -status C:` shows Protection On with TPM and Numerical Password protectors, and the device log confirms the recovery key reached Entra ID.
 
+Later I added a firewall policy, a settings catalog profile, a Sysmon app and a Windows Update ring. Intune reports all four policies as Succeeded on the device.
+
+![Intune Device configuration page for the lab VM showing Lab-BitLocker, Lab-Firewall, Lab-Settings and Lab-Update-Ring as Succeeded](../screenshots/device-configuration-all-succeeded.png)
+
+Intune can say Succeeded while a device fails, as the BitLocker problem below showed, so I also checked on the VM itself: registry values for the policies, `manage-bde -status C:`, and the Sysmon service and event log. The VM's own view of what Intune manages is under Settings, Accounts, Access work or school, Info.
+
+![The Areas managed by page on the VM listing the policy areas and the Intune Management Extension](../screenshots/areas-managed-by-intune.png)
+
+The Lab-Settings policy also sets a logon notice. It appears at sign-in, not when the session is locked.
+
+![The logon notice "Lab System. Authorized use only." shown at sign-in on the VM](../screenshots/logon-banner.png)
+
 ## What broke and how I fixed it
 
 | Symptom | Cause | Fix |
