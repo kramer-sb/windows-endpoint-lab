@@ -90,7 +90,7 @@ This is a good moment for a screenshot and a snapshot named `enrolled`.
 ## Part 8: Compliance policy
 
 1. Intune, Devices, Compliance, Create policy, Platform = Windows 10 and later.
-2. Name it `Lab-Windows-Compliance`. Suggested settings: Device Health, require BitLocker, Secure Boot and code integrity. Device Properties, minimum OS version `10.0.22000`. System Security, require firewall, antivirus, antispyware and Defender real-time protection.
+2. Name it `Lab-Windows-Compliance`. Suggested settings: Device Health, require BitLocker, Secure Boot and code integrity. Device Properties, minimum OS version `10.0.19041`. System Security, require firewall, antivirus, antispyware and Defender real-time protection.
 3. Actions for noncompliance: Mark device noncompliant, immediately.
 4. Assign to `Lab-Users`.
 5. On the VM, sync (Part 7, step 4, Sync button) and wait a few minutes. In Intune, check Devices, the device, Device compliance.
@@ -116,29 +116,50 @@ Expect the compliance result to take 15 to 60 minutes to appear, and the dashboa
 
 ## Part 10: Deploy an app
 
-1. Intune, Apps, Windows, Add, App type = Microsoft Store app (new). Search for 7-Zip (or Notepad++), select it, and add it.
-2. Assignments: Required, group `Lab-Users`. Leave the install context as System unless the app requires otherwise.
+Two routes. The Microsoft Store app (new) route is quick, but only works for apps that are in the Store. Wireshark, for example, did not appear in the Store search, so a classic desktop app needs the Win32 route. This part uses Sysmon, which gives the lab real endpoint telemetry.
+
+Quick route (Store apps)
+
+1. Intune, Apps, Windows, Create, App type = Microsoft Store app (new). Search for the app (for example Windows Terminal), select it, and add it.
+2. Assignments: Required, All devices. Leave the install context as System unless the app requires otherwise.
 3. Sync the VM and wait. Confirm the app appears on the VM and shows Installed in Intune under Apps, Monitor.
-4. Stretch goal: package a small installer as a Win32 app with the Win32 Content Prep Tool (`.intunewin`) and deploy that. It is more work and much closer to real-world deployments.
+
+Win32 route (Sysmon)
+
+1. Windows Host: make a working folder outside your Git repos, for example `C:\IntuneLab\sysmon\source`, so the binaries are never committed. Download `Sysmon64.exe` from the Microsoft Sysinternals Sysmon page and a Sysmon config (the SwiftOnSecurity `sysmonconfig-export.xml` on GitHub is a common starting point; read it before deploying it). Put both files in `source`. Do not rename the config unless you change the install command to match. Download `IntuneWinAppUtil.exe` (the Win32 Content Prep Tool) from the `microsoft/Microsoft-Win32-Content-Prep-Tool` GitHub repo into `C:\IntuneLab\sysmon`.
+2. Windows Host: package it. In PowerShell, in `C:\IntuneLab\sysmon`, run `.\IntuneWinAppUtil.exe -c .\source -s Sysmon64.exe -o .\output`. The result is `output\Sysmon64.intunewin`.
+3. Windows Host: Intune, Apps, Windows, Create, App type = Windows app (Win32), Select. Upload the `.intunewin` file. Name `Sysmon`, publisher `Microsoft`.
+4. Program tab: install command `Sysmon64.exe -accepteula -i sysmonconfig-export.xml` (use the real config file name), uninstall command `Sysmon64.exe -u force`, install behavior System, device restart behavior No specific action.
+5. Requirements: 64-bit, Windows 10 1607 or later.
+6. Detection rules: manually configure, rule type File, path `C:\Windows`, file `Sysmon64.exe`, detection method File or folder exists. This is the path on the VM after install, not the path where you built the package.
+7. Leave Dependencies and Supersedence empty. Assignments: Required, All devices. Create. Take a Proxmox snapshot first so you can roll back.
+8. Windows VM: sync and wait. Win32 apps are slower than policies. Verify with `Get-Service Sysmon64` (Running), then `Get-WinEvent -LogName "Microsoft-Windows-Sysmon/Operational" -MaxEvents 5 | Format-List TimeCreated, Id, Message`. Event 1 is a process creation and event 3 is a network connection. `C:\Windows\Sysmon64.exe -c` prints the loaded configuration; the config hash should match `Get-FileHash` of the file you packaged.
+9. If an install fails or looks stuck, read `AppWorkload.log` in `C:\ProgramData\Microsoft\IntuneManagementExtension\Logs` and search it for the app name. Newer Intune clients log app installs there, not in `IntuneManagementExtension.log`.
+10. In Intune, Apps, Monitor, Device install status should show Installed.
 
 ## Part 11: Windows Update ring
 
-1. Intune, Devices, Windows, Windows updates, Update rings, Create profile.
-2. For a lab, set quality update deferral 0 days and feature update deferral 0 days. Assign to `Lab-Users`.
-3. Check the device's update status after a sync. Note in your write-up what a real organization would set differently (pilot rings, deferrals, maintenance windows).
+1. Intune, Devices, Windows, Windows updates, Update rings, Create profile. Name it `Lab-Update-Ring`.
+2. For a lab, set quality update deferral 0 days and feature update deferral 0 days. Leave Upgrade Windows 10 devices to Latest Windows 11 release on No (the VM already runs Windows 11), and pre-release builds on Not configured.
+3. Under User experience settings, choose an Automatic update behavior that does not surprise you with a restart. This lab used Auto install and restart at a scheduled time, every day (Any Day), at a time when the VM is running but not in use. The VM must be powered on at that time for the install to happen.
+4. Assign to All devices (update rings are device targeted, and the earlier lab policies ended up on All devices too).
+5. Sync the VM. On the VM, the Settings, Accounts, Access work or school, Info page lists the managed areas, including Update. To check the values that landed, run `Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\PolicyManager\current\device\Update"`. For this lab the values were ScheduledInstallTime 9, ScheduledInstallDay 0, AllowAutoUpdate 3, DeferQualityUpdatesPeriodInDays 0 and DeferFeatureUpdatesPeriodInDays 0. The WinningProvider values are the Intune enrollment ID.
+6. Check the ring shows Succeeded under the device's Device configuration. Note in your write-up what a real organization would set differently (pilot rings, longer deferrals, maintenance windows).
+
+Check the VM clock first. Scheduled installs use the VM's local time, and log timestamps depend on it. In this lab the VM had its time zone set to Pacific and its clock three hours ahead of real UTC, which showed up in the Sysmon `UtcTime` field. Fix it with `Set-TimeZone -Id "Eastern Standard Time"` (use your own zone), then `Restart-Service w32time` and `w32tm /resync /force`. After a large correction, `w32tm /query /status` can report not synchronized for a few minutes. Confirm with `Get-Date` and `(Get-Date).ToUniversalTime()`.
 
 ## Part 12: Conditional Access (the main event)
 
 Warning: do this carefully and in order. A bad policy can lock out admins.
 
-1. Security defaults first. New tenants have security defaults on, and you cannot use Conditional Access with them. In Entra, Overview, Properties, Manage security defaults, set to Disabled. Create the admin MFA policy in step 2 right away so admins stay protected.
-2. Create `CA-Admins-Require-MFA`: Users = Directory roles, Global Administrator, and exclude `bg-admin`. Target resources = All cloud apps. Grant = Require multifactor authentication. Turn it On. The break-glass account stays excluded from every policy so a mistake can never lock you out of the tenant.
+1. Security defaults first. New tenants have security defaults on, and you cannot use Conditional Access with them. In Entra, Overview, Properties, Manage security defaults, set to Disabled. Turning security defaults off makes Microsoft create its own managed Conditional Access policies (for example multifactor authentication for admins and for all users), so you do not need to build an admin MFA policy yourself.
+2. Protect the break-glass account. In Entra, Protection, Conditional Access, Policies, open each Microsoft-managed policy, add `bg-admin` under Exclude, and save. Leave Microsoft's own exclusions (such as Directory Synchronization Accounts) as they are. Make sure your own admin account has a working MFA method first (an authenticator app is fine) so the managed admin policy does not lock you out. Optionally rename the admin account's display name (Entra, Users) to something readable like `Lab Admin`, which makes the sign-in logs easier to read.
 3. Create the main policy `CA-LabUsers-Compliant-Device-MFA`. Users, Include = `Lab-Users`, Exclude = `bg-admin` and your admin account. Target resources = Office 365 (not All cloud apps, which is riskier). Grant = Require multifactor authentication and Require device to be marked as compliant, with "Require all the selected controls" chosen.
 4. Set Enable policy = Report-only and create it.
-5. Open https://www.office.com on the VM and sign in as `Lab User`. In Entra, Monitoring, Sign-in logs, open that sign-in and check the Report-only tab to see the policy would have been satisfied.
-6. Switch the policy to On.
+5. Open https://www.office.com on the VM and sign in as `Lab User`. In Entra, Monitoring, Sign-in logs, open that sign-in and check the Report-only tab to see the policy would have been satisfied. Sign-in log entries can take several minutes to appear. Also sign in once as your admin account to confirm the exclusion shows Not applied.
+6. Switch the policy to On. Report-only never blocks anything, so a private-window test on your normal PC will log a failure but still let you in until the policy is On.
 7. Prove it works. On your normal PC, open a private browser window, go to https://www.office.com and sign in as `Lab User`. It should be blocked or told the device must be managed. On the VM, access works.
-8. Prove it reacts to compliance. In the compliance policy, temporarily raise the minimum OS version above what Windows reports (for example `10.0.99999`). Sync the VM, wait for it to turn Noncompliant, then try office.com on the VM and confirm it is blocked. Put the setting back, sync, and confirm access returns.
+8. Prove it reacts to compliance. In the compliance policy, temporarily raise the minimum OS version above what Windows reports (for example `10.0.60000`; the portal rejects values above 65535 in any part, such as `10.0.99999`). Sync the VM, wait for it to turn Noncompliant, then try office.com on the VM and confirm it is blocked. Put the setting back, sync, and confirm access returns. Expect a delay here. In the lab, the device stayed Noncompliant for over an hour after the setting was restored, even though the device synced successfully, and then flipped to Compliant on its own. Removing and re-adding the assignment is a possible way to force it, but it was not needed.
 
 ## Part 13: Remote actions, rebuild and cleanup
 
@@ -156,6 +177,10 @@ Warning: do this carefully and in order. A bad policy can lock out admins.
 - Settings never apply: use the Sync button on the VM and in the portal, and give policies up to 15 to 30 minutes. In the portal, the device's Device configuration page shows errors per setting.
 - BitLocker policy shows Succeeded but `manage-bde -status C:` says Protection Off with no key protectors: read the BitLocker Management event log on the VM. Event 853 about bootable media means an ISO is still attached to a virtual CD/DVD drive. Set the drives to Do not use any media in Proxmox, sync, and wait a few minutes.
 - Policy assigned but device compliance page is empty for an hour or more: check the policy's own Monitor page and Per-setting status, which update before the dashboard and the device page. Switching the assignment from `Lab-Users` to All devices does not hurt on a one-device lab.
+- Win32 app stuck on Waiting for install status in the old Managed Apps report: use Apps, the app, Device install status instead, and sync the VM once more. Install activity is in `AppWorkload.log`.
+- VM frozen, Remote Desktop error 0x204, Proxmox console unresponsive, and a graceful shutdown times out because the guest agent does not answer: use Stop (hard power-off) in Proxmox, then Start. Take a snapshot before risky changes.
+- VM clock or time zone wrong (log timestamps in the future, scheduled installs at odd times): see the clock fix in Part 11.
+- Device stays Noncompliant after you fix the compliance policy, and the per-setting page shows one setting failing that the device clearly passes: this was a stale evaluation. Check the policy's Monitor page, View report, and the Last contacted time. The VM can show a successful sync while the portal lags, and it can take over an hour to catch up. Do not keep changing the policy while you wait.
 - Locked out by Conditional Access: sign in with `bg-admin`, set the policy to Off, and fix it.
 
 ## What to capture and write up
