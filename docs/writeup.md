@@ -19,6 +19,10 @@ My earlier Intune exposure was coursework, not a working lab, and I wanted to sh
 | Access | Remote Desktop from my main PC |
 | Protection | A Proxmox snapshot and an encrypted Proxmox Backup Server backup of the VM before enrollment |
 
+I took a snapshot before each risky change, so every part of the lab had a rollback point.
+
+![Proxmox snapshot list for the Windows VM, one snapshot per stage of the lab](../screenshots/win11-intune-lab-snapshots.png)
+
 ## What I built so far
 
 1. Created the VM and installed Windows 11, loading the VirtIO storage driver during setup.
@@ -41,6 +45,17 @@ Result: all eight compliance settings report compliant, `manage-bde -status C:` 
 | BitLocker policy showed Succeeded in Intune, but `manage-bde` showed Protection Off and no key protectors | The Windows install ISO and the VirtIO ISO were still attached as virtual DVDs. The BitLocker Management event log repeated event 853, "detected bootable media (CD or DVD)". | Set both drives to no media in Proxmox. The policy retried on its own, protection turned on, and event 845 confirmed the key backup to Entra ID. |
 | BitLocker compliance passed before my policy applied | Windows had started device encryption on its own (event 4146) but left the key unprotected. Intune only checks that the drive is encrypted. | The BitLocker policy added the TPM and recovery password protectors. |
 | `.lab` names did not resolve after setting a static IP and DNS | IPv6 was still enabled, so Windows asked the ISP's IPv6 DNS server instead of the lab's CoreDNS. | Disabled IPv6 on the adapter, as the lab already does on its other machines. |
+| The device stayed Noncompliant for over an hour after I restored the minimum OS version, even though the VM reported successful syncs | Seven of the eight settings were Compliant and only the minimum OS version failed, although the device reported a build well above the required one. The policy's Last contacted time was older than my syncs. I could not confirm the cause, but it looked like a stale evaluation. | Forcing syncs did not speed it up. The device flipped to Compliant on its own, and I then confirmed the lab user could sign in again. |
+
+## Conditional Access results
+
+I disabled security defaults, which made Microsoft create its own managed Conditional Access policies, and I excluded my break-glass account from all of them. Then I created a policy for the `Lab-Users` group on Office 365 that requires MFA and a compliant device. I ran it in report-only mode first. In report-only mode a sign-in from an unmanaged PC logged a failure but still let me in, because report-only never blocks. After I switched the policy to On, the same sign-in was blocked.
+
+![Microsoft sign-in page saying "You can't get there from here" for an unmanaged browser](../screenshots/conditional-access-block.png)
+
+To prove the policy reacts to device state, I raised the minimum OS version in the compliance policy above what Windows reports. The VM went Noncompliant and the lab user was blocked on the VM. The Check compliance button opens the Company Portal, which tells the user what to fix.
+
+![The block page on the left and the Company Portal on the right explaining the OS version requirement](../screenshots/noncompliant-block-and-company-portal.png)
 
 ## What I took from it, and what is next
 
@@ -48,10 +63,8 @@ Three lessons stand out. Portal status is not device truth, so when a policy loo
 
 Still to do in this lab:
 
-- A firewall policy and a settings catalog profile (inactivity limit, Autoplay off, logon banner)
-- A Microsoft Store app deployed as required
-- A Windows Update ring
-- Conditional Access, tested in report-only mode first, then enforced
 - Remote actions, a wipe and rebuild, and cleanup before the 30-day trials end
 
-I will add screenshots (the enrolled device, the compliance results, the BitLocker event log, and the recovery key location with the key hidden) as I finish each part.
+I will add more screenshots (the enrolled device, the compliance results, the BitLocker event log, and the recovery key location with the key hidden) as I finish each part.
+
+The firewall policy, the settings catalog profile (inactivity limit, Autoplay off, logon banner), the Sysmon app deployed through Intune, the Windows Update ring and the Conditional Access tests are done and are written up in the tutorial.
