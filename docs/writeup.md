@@ -1,8 +1,8 @@
 # Building an Intune-managed Windows 11 lab on Proxmox
 
-Written October 11, 2026. This is a work in progress.
+Written October 11, 2026. Updated October 16, 2026. This is a work in progress; remote actions, the rebuild and cleanup are still to do.
 
-I built a Windows 11 VM on my Proxmox home lab, joined it to Microsoft Entra ID, enrolled it in Intune, and got a compliance policy and a BitLocker policy working on it. The most useful thing I learned was that Intune reported the BitLocker policy as Succeeded while the device was failing to apply it.
+I built a Windows 11 VM on my Proxmox home lab, joined it to Microsoft Entra ID, enrolled it in Intune, and got compliance, BitLocker, firewall and settings catalog policies, an app deployment, an update ring and Conditional Access working on it. The most useful thing I learned was that Intune reported the BitLocker policy as Succeeded while the device was failing to apply it.
 
 ## Why I built it
 

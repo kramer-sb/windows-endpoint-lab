@@ -1,10 +1,10 @@
 # windows-endpoint-lab
 
-A Windows 11 endpoint lab built on Proxmox. Right now it covers enrolling the VM in Microsoft Intune, a compliance policy, and BitLocker. The scope will grow as I use the VM for other work over its 90-day evaluation period.
+A Windows 11 endpoint lab built on Proxmox. It covers enrolling the VM in Microsoft Intune and configuring compliance, BitLocker, firewall and settings catalog policies, app deployment, a Windows Update ring, and Conditional Access. Remote actions, a wipe and rebuild, and cleanup are still to do. The scope may grow as I use the VM for other work over its 90-day evaluation period.
 
 **Status: work in progress.** Parts are finished and documented, parts are not. The status table below is the current state.
 
-<small> *You might ask, "Brie, what led you to tackle this?" and I would tell you that it was a simple little job search with Claude asking me if I knew InTune explicitly because it was in a JD and it's on my resume. Well, it was coursework, GSEC I believe. So Claude said it could write up a tutorial, and here we are. This has been a LONG process over the past two days and we're not finished! #AlwaysBrieLearning* 
+<small> *You might ask, "Brie, what led you to tackle this?" and I would tell you that it was a simple little job search with Claude asking me if I knew Intune explicitly because it was in a JD and it's on my resume. Well, it was coursework, GSEC I believe. So Claude said it could write up a tutorial, and here we are.* 
 
 ## What is here
 
@@ -27,10 +27,10 @@ A Windows 11 endpoint lab built on Proxmox. Right now it covers enrolling the VM
 | Entra join and Intune enrollment | Done |
 | Compliance policy | Done |
 | BitLocker policy, with recovery key in Entra ID | Done |
-| Firewall policy and settings catalog profile | Next |
-| App deployment, update ring | Not started |
-| Conditional Access (report-only, then enforced) | Not started |
-| Remote actions, rebuild, cleanup | Not started |
+| Firewall policy and settings catalog profile | Done |
+| App deployment, update ring | Done |
+| Conditional Access (report-only, then enforced) | Done |
+| Remote actions, rebuild, cleanup | Next |
 
 ## The short version of what I learned
 
